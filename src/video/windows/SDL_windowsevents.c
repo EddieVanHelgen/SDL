@@ -687,6 +687,23 @@ static void WIN_HandleRawMouseInput(Uint64 timestamp, SDL_VideoData *data, HANDL
         }
     }
 
+    /* PDZ Restored (local change): buttons 6-32. usButtonFlags only has 1-5;
+       a mouse driver that reports more puts them in the device's raw button
+       state (bit n = button n + 1). Sent as SDL buttons 6-32. */
+    {
+        static ULONG prev_extra_buttons = 0;
+        const ULONG extra = rawmouse->ulRawButtons & ~(ULONG)0x1F;
+        ULONG changed = extra ^ prev_extra_buttons;
+        prev_extra_buttons = extra;
+        for (int bit = 5; changed != 0 && bit < 32; ++bit) {
+            const ULONG mask = (ULONG)1 << bit;
+            if (changed & mask) {
+                changed &= ~mask;
+                SDL_SendMouseButton(timestamp, window, mouseID, (Uint8)(bit + 1), (extra & mask) != 0);
+            }
+        }
+    }
+
     if (haveButton) {
         for (int i = 0; i < SDL_arraysize(raw_buttons); ++i) {
             if (rawmouse->usButtonFlags & raw_buttons[i].usButtonFlags) {
